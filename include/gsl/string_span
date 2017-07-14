@@ -308,24 +308,35 @@ public:
     {
     }
 
+    // from span
+    template<class SpanElementType,
+        std::ptrdiff_t SpanExtent,
+        class = std::enable_if_t<details::is_allowed_element_type_conversion<SpanElementType, element_type>::value &&
+        details::is_allowed_extent_conversion<SpanExtent, Extent>::value>>
+    constexpr basic_string_span(const span<SpanElementType, SpanExtent>& s) : span_(s)
+    {
+    }
+
     // from containers. Containers must have a pointer type and data() function signatures
     template <class Container,
+        class IteratorTraits = std::iterator_traits<typename Container::iterator>,
               class = std::enable_if_t<
-                  !details::is_basic_string_span<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
-    constexpr basic_string_span(Container& cont) : span_(cont)
+        !details::is_basic_string_span<Container>::value && !details::is_std_array<Container>::value && !details::is_span<Container>::value &&
+        std::is_same<typename IteratorTraits::iterator_category, std::random_access_iterator_tag>::value &&
+        details::is_allowed_element_type_conversion<std::decay_t<typename IteratorTraits::value_type>, std::decay_t<element_type>>::value &&
+        std::is_convertible<typename IteratorTraits::pointer, decltype(std::declval<Container>().data())>::value>>
+        constexpr basic_string_span(Container& cont) : span_(cont)
     {
     }
 
     template <class Container,
+        class IteratorTraits = std::iterator_traits<typename Container::iterator>,
               class = std::enable_if_t<
-                  !details::is_basic_string_span<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
-    constexpr basic_string_span(const Container& cont) : span_(cont)
+        std::is_const<element_type>::value && !details::is_basic_string_span<Container>::value && !details::is_span<Container>::value &&
+        std::is_same<typename IteratorTraits::iterator_category, std::random_access_iterator_tag>::value &&
+        details::is_allowed_element_type_conversion<std::decay_t<typename IteratorTraits::value_type>, std::decay_t<element_type>>::value &&
+        std::is_convertible<typename IteratorTraits::pointer, decltype(std::declval<Container>().data())>::value>>
+        constexpr basic_string_span(const Container& cont) : span_(cont)
     {
     }
 
@@ -456,8 +467,8 @@ public:
     using zstring_type = basic_zstring<value_type, Extent>;
     using const_zstring_type = basic_zstring<const_value_type, Extent>;
 
-    using impl_type = span<value_type, Extent>;
     using string_span_type = basic_string_span<value_type, Extent>;
+    using impl_type = string_span_type;
 
     constexpr basic_zstring_span(impl_type s) GSL_NOEXCEPT : span_(s)
     {
@@ -467,6 +478,9 @@ public:
 
     // copy
     constexpr basic_zstring_span(const basic_zstring_span& other) = default;
+    
+    template <class OtherCharT, std::ptrdiff_t OtherMax, class = std::enable_if_t<std::is_const<CharT>::value && !std::is_const<OtherCharT>::value>>
+    constexpr basic_zstring_span(const basic_zstring_span<OtherCharT, OtherMax>& other) : span_(other.span_) {}
 
 // move
     constexpr basic_zstring_span(basic_zstring_span&& other) = default;

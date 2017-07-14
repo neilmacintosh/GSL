@@ -13,6 +13,10 @@
 // THE SOFTWARE.
 //
 ///////////////////////////////////////////////////////////////////////////////
+#ifdef _MSC_VER
+// disable MSVC int-to-char conversion warning generated (as expected) by these tests
+#pragma warning(disable:4244) 
+#endif
 
 #include <catch/catch.hpp>
 

@@ -369,38 +369,33 @@ public:
     {
     }
 
-    template <class ArrayElementType = std::add_pointer<element_type>>
-    constexpr span(const std::unique_ptr<ArrayElementType>& ptr, index_type count)
-        : storage_(ptr.get(), count)
-    {
-    }
+    constexpr span(const std::unique_ptr<ElementType[]>& ptr, index_type count) : storage_(ptr.get(), count) {}
+    constexpr span(const std::unique_ptr<ElementType>& ptr) : storage_(ptr.get(), ptr.get() ? 1 : 0) {}
+    constexpr span(const std::shared_ptr<ElementType>& ptr) : storage_(ptr.get(), ptr.get() ? 1 : 0) {}
 
-    constexpr span(const std::unique_ptr<ElementType>& ptr) : storage_(ptr.get(), ptr.get() ? 1 : 0)
-    {
-    }
-    constexpr span(const std::shared_ptr<ElementType>& ptr) : storage_(ptr.get(), ptr.get() ? 1 : 0)
-    {
-    }
-
-    // NB: the SFINAE here uses .data() as a incomplete/imperfect proxy for the requirement
-    // on Container to be a contiguous sequence container.
+    // NB: the SFINAE here uses a few tests as an incomplete/imperfect proxy for the requirement on Container
+    // to be a contiguous sequence container (in the absence of a practical way to identify contiguous iterators):
+    // 1. That it has a random access iterator type for ::iterator (section 23.2.1 para 13)
+    // 2. That it has a .data() function that returns a pointer (not specified in the standard, but pragmatic)
     template <class Container,
+        class IteratorTraits = std::iterator_traits<typename Container::iterator>,
               class = std::enable_if_t<
-                  !details::is_span<Container>::value && !details::is_std_array<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
+                  !details::is_span<Container>::value && !details::is_std_array<Container>::value &&                  
+                  std::is_same<typename IteratorTraits::iterator_category, std::random_access_iterator_tag>::value &&
+                  details::is_allowed_element_type_conversion<std::decay_t<typename IteratorTraits::value_type>, std::decay_t<element_type>>::value &&
+                  std::is_convertible<typename IteratorTraits::pointer, decltype(std::declval<Container>().data())>::value>>
     constexpr span(Container& cont) : span(cont.data(), narrow<index_type>(cont.size()))
     {
     }
 
     template <class Container,
-              class = std::enable_if_t<
+        class IteratorTraits = std::iterator_traits<typename Container::iterator>,
+        class = std::enable_if_t<
                   std::is_const<element_type>::value && !details::is_span<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
-    constexpr span(const Container& cont) : span(cont.data(), narrow<index_type>(cont.size()))
+                  std::is_same<typename IteratorTraits::iterator_category, std::random_access_iterator_tag>::value &&
+                  details::is_allowed_element_type_conversion<std::decay_t<typename IteratorTraits::value_type>, std::decay_t<element_type>>::value &&
+                  std::is_convertible<typename IteratorTraits::pointer, decltype(std::declval<Container>().data())>::value>>
+		constexpr span(const Container& cont) : span(cont.data(), narrow<index_type>(cont.size()))
     {
     }
 
