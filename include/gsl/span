@@ -102,6 +102,14 @@ namespace details
     {
     };
 
+    template <class T>
+    struct is_supported_container 
+        : public std::integral_constant<bool, true> /*is_span<T>::value &&
+                  std::is_convertible<typename T::pointer,
+                                      decltype(std::data(std::declval<T>()))>::value>*/
+    {
+    };
+
     template <std::ptrdiff_t From, std::ptrdiff_t To>
     struct is_allowed_extent_conversion
         : public std::integral_constant<bool, From == To || From == gsl::dynamic_extent ||
@@ -372,37 +380,12 @@ public:
     {
     }
 
-    template <std::size_t N, class ArrayElementType = std::remove_const_t<element_type>>
-    constexpr span(std::array<ArrayElementType, N>& arr) GSL_NOEXCEPT
-        : storage_(&arr[0], details::extent_type<N>())
-    {
-    }
-
-    template <std::size_t N>
-    constexpr span(const std::array<std::remove_const_t<element_type>, N>& arr) GSL_NOEXCEPT
-        : storage_(&arr[0], details::extent_type<N>())
-    {
-    }
-
-    // NB: the SFINAE here uses .data() as a incomplete/imperfect proxy for the requirement
+    // NB: the SFINAE here uses std::data() as a incomplete/imperfect proxy for the requirement
     // on Container to be a contiguous sequence container.
-    template <class Container,
-              class = std::enable_if_t<
-                  !details::is_span<Container>::value && !details::is_std_array<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
-    constexpr span(Container& cont) : span(cont.data(), narrow<index_type>(cont.size()))
-    {
-    }
 
     template <class Container,
-              class = std::enable_if_t<
-                  std::is_const<element_type>::value && !details::is_span<Container>::value &&
-                  std::is_convertible<typename Container::pointer, pointer>::value &&
-                  std::is_convertible<typename Container::pointer,
-                                      decltype(std::declval<Container>().data())>::value>>
-    constexpr span(const Container& cont) : span(cont.data(), narrow<index_type>(cont.size()))
+              class = std::enable_if_t<details::is_supported_container<Container>::value>
+    constexpr span(Container& cont) : span(std::data(cont), narrow<index_type>(std::size(cont)))
     {
     }
 
